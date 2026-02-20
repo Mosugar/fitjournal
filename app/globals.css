@@ -1,65 +1,70 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 :root {
-  --bg: #f4f4f0;
+  --bg: #f2f2ef;
   --bg2: #ffffff;
-  --bg3: #eeeee8;
+  --bg3: #e8e8e4;
   --card: #ffffff;
-  --border: #e0e0d8;
-  --text: #111111;
-  --text2: #666666;
+  --border: #ddddd8;
+  --text: #0a0a0a;
+  --text2: #888880;
   --accent: #ff4500;
-  --accent2: #00c8ff;
-  --green: #00ff88;
+  --accent2: #0066ff;
+  --green: #00c853;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
 }
 
 .dark {
-  --bg: #0a0a0f;
-  --bg2: #111118;
-  --bg3: #1a1a24;
-  --card: #16161f;
-  --border: #2a2a38;
+  --bg: #080810;
+  --bg2: #0f0f18;
+  --bg3: #161622;
+  --card: #121220;
+  --border: #1e1e2e;
   --text: #f0f0f0;
-  --text2: #888899;
+  --text2: #606070;
+  --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  margin: 0;
-  transition: background 0.2s ease, color 0.2s ease;
+  font-family: 'Barlow', sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 input, textarea, button, select {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Barlow', sans-serif;
+}
+
+.condensed {
+  font-family: 'Barlow Condensed', sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.bebas {
+  font-family: 'Barlow Condensed', sans-serif;
+  letter-spacing: 0.05em;
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: var(--date-filter, none);
+  opacity: 0.5;
+  cursor: pointer;
 }
-
 .dark input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(1);
 }
 
-::-webkit-scrollbar {
-  width: 4px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 2px;
-}
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-.bebas {
-  font-family: 'Bebas Neue', sans-serif;
-  letter-spacing: 0.05em;
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
+.fadeUp { animation: fadeUp 0.3s ease forwards; }
