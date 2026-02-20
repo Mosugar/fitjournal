@@ -16,23 +16,42 @@ type Props = {
   currentUserProfile: any
 }
 
-export default function FeedClient({ sessions, likes: initialLikes, follows: initialFollows, currentUserId, currentUserProfile }: Props) {
+export default function FeedClient({
+  sessions,
+  likes: initialLikes,
+  follows: initialFollows,
+  currentUserId,
+  currentUserProfile,
+}: Props) {
   const [likes, setLikes] = useState(initialLikes)
   const [follows, setFollows] = useState(initialFollows)
   const supabase = createClient()
 
   const isFollowing = (userId: string) => follows.some(f => f.following_id === userId)
 
-  const handleLike = async (sessionId: string) => {
+  const handleLike = async (session: any) => {
     if (!currentUserId) return toast.error('Connecte-toi pour liker')
-    const already = likes.some(l => l.session_id === sessionId && l.user_id === currentUserId)
+    const already = likes.some(l => l.session_id === session.id && l.user_id === currentUserId)
 
     if (already) {
-      setLikes(prev => prev.filter(l => !(l.session_id === sessionId && l.user_id === currentUserId)))
-      await supabase.from('likes').delete().eq('user_id', currentUserId).eq('session_id', sessionId)
+      setLikes(prev => prev.filter(l => !(l.session_id === session.id && l.user_id === currentUserId)))
+      await supabase.from('likes')
+        .delete()
+        .eq('user_id', currentUserId)
+        .eq('session_id', session.id)
     } else {
-      setLikes(prev => [...prev, { session_id: sessionId, user_id: currentUserId }])
-      await supabase.from('likes').insert({ user_id: currentUserId, session_id: sessionId })
+      setLikes(prev => [...prev, { session_id: session.id, user_id: currentUserId }])
+      await supabase.from('likes').insert({ user_id: currentUserId, session_id: session.id })
+
+      // Send notification (only if not liking your own session)
+      if (session.profiles.id !== currentUserId) {
+        await supabase.from('notifications').insert({
+          user_id: session.profiles.id,
+          actor_id: currentUserId,
+          type: 'like',
+          session_id: session.id,
+        })
+      }
     }
   }
 
@@ -43,11 +62,21 @@ export default function FeedClient({ sessions, likes: initialLikes, follows: ini
     const already = isFollowing(userId)
     if (already) {
       setFollows(prev => prev.filter(f => f.following_id !== userId))
-      await supabase.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', userId)
+      await supabase.from('follows')
+        .delete()
+        .eq('follower_id', currentUserId)
+        .eq('following_id', userId)
       toast.success('Abonnement annulé')
     } else {
       setFollows(prev => [...prev, { following_id: userId }])
       await supabase.from('follows').insert({ follower_id: currentUserId, following_id: userId })
+
+      // Send notification
+      await supabase.from('notifications').insert({
+        user_id: userId,
+        actor_id: currentUserId,
+        type: 'follow',
+      })
       toast.success('Abonné ! 🔥')
     }
   }
@@ -69,11 +98,11 @@ export default function FeedClient({ sessions, likes: initialLikes, follows: ini
           const following = isFollowing(s.profiles.id)
 
           return (
-            <div key={s.id} style={{
+            <div key={s.id} className="fadeUp" style={{
               background: 'var(--card)', border: '1px solid var(--border)',
               borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--shadow)',
               animationDelay: `${i * 0.04}s`,
-            }} className="fadeUp">
+            }}>
 
               {/* User header */}
               <div style={{ padding: '14px 16px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -151,7 +180,7 @@ export default function FeedClient({ sessions, likes: initialLikes, follows: ini
                 padding: '10px 16px', borderTop: '1px solid var(--border)',
                 display: 'flex', alignItems: 'center', gap: 8,
               }}>
-                <button onClick={() => handleLike(s.id)} style={{
+                <button onClick={() => handleLike(s)} style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   padding: '6px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
                   background: userLiked ? '#ef444415' : 'var(--bg3)',
@@ -161,7 +190,7 @@ export default function FeedClient({ sessions, likes: initialLikes, follows: ini
                   <svg width="14" height="14" viewBox="0 0 24 24" fill={userLiked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                   </svg>
-                  {sessionLikes.length > 0 ? sessionLikes.length : 'J\'aime'}
+                  {sessionLikes.length > 0 ? sessionLikes.length : "J'aime"}
                 </button>
 
                 <Link href={`/${s.profiles.username}/journal/${s.id}`} style={{

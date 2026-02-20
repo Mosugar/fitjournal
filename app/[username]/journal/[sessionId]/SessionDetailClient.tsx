@@ -54,6 +54,7 @@ type Comment = {
 export default function SessionDetailClient({
   session, username, likesCount: initialLikes, userLiked: initialLiked,
   comments: initialComments, currentUserId, currentUserProfile, isOwn,
+  sessionOwnerId,
 }: {
   session: Session & { exercises: any[] }
   username: string
@@ -63,6 +64,7 @@ export default function SessionDetailClient({
   currentUserId: string | null
   currentUserProfile: any
   isOwn: boolean
+  sessionOwnerId: string
 }) {
   const [liked, setLiked] = useState(initialLiked)
   const [likesCount, setLikesCount] = useState(initialLikes)
@@ -83,6 +85,15 @@ export default function SessionDetailClient({
     } else {
       setLiked(true); setLikesCount(c => c + 1)
       await supabase.from('likes').insert({ user_id: currentUserId, session_id: session.id })
+      // Notification — don't notify yourself
+      if (sessionOwnerId !== currentUserId) {
+        await supabase.from('notifications').insert({
+          user_id: sessionOwnerId,
+          actor_id: currentUserId,
+          type: 'like',
+          session_id: session.id,
+        })
+      }
     }
   }
 
@@ -99,6 +110,15 @@ export default function SessionDetailClient({
     setComments(prev => [...prev, data])
     setNewComment('')
     setPosting(false)
+    // Notification — don't notify yourself
+    if (sessionOwnerId !== currentUserId) {
+      await supabase.from('notifications').insert({
+        user_id: sessionOwnerId,
+        actor_id: currentUserId,
+        type: 'comment',
+        session_id: session.id,
+      })
+    }
   }
 
   const handleDeleteComment = async (commentId: string) => {

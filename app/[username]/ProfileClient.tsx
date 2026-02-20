@@ -2,6 +2,9 @@
 
 import { Profile, Session } from '@/lib/types'
 import Link from 'next/link'
+import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import toast from 'react-hot-toast'
 
 const FEELING_COLORS = ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6']
 
@@ -34,41 +37,76 @@ const IconFlame = () => (
 
 function calcStreak(sessions: Session[]): number {
   if (sessions.length === 0) return 0
-
-  // Get unique dates sorted descending
   const dates = [...new Set(sessions.map(s => s.date))].sort((a, b) => b.localeCompare(a))
-
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const todayStr = today.toISOString().split('T')[0]
-
   const yesterday = new Date(today)
   yesterday.setDate(yesterday.getDate() - 1)
   const yesterdayStr = yesterday.toISOString().split('T')[0]
-
-  // Streak must start from today or yesterday
   if (dates[0] !== todayStr && dates[0] !== yesterdayStr) return 0
-
   let streak = 1
   for (let i = 1; i < dates.length; i++) {
     const prev = new Date(dates[i - 1])
     const curr = new Date(dates[i])
     const diffDays = Math.round((prev.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24))
-    if (diffDays === 1) {
-      streak++
-    } else {
-      break
-    }
+    if (diffDays === 1) { streak++ } else { break }
   }
-
   return streak
 }
 
-export default function ProfileClient({ profile, sessions, isOwn }: {
-  profile: Profile; sessions: Session[]; isOwn: boolean
-}) {
+type Props = {
+  profile: Profile
+  sessions: Session[]
+  isOwn: boolean
+  followersCount: number
+  followingCount: number
+  isFollowing?: boolean
+  currentUserId?: string | null
+}
+
+export default function ProfileClient({
+  profile,
+  sessions,
+  isOwn,
+  followersCount: initialFollowersCount,
+  followingCount,
+  isFollowing: initialIsFollowing = false,
+  currentUserId = null,
+}: Props) {
   const recentSessions = sessions.slice(0, 3)
   const streak = calcStreak(sessions)
+  const supabase = createClient()
+
+  const [following, setFollowing] = useState(initialIsFollowing)
+  const [followersCount, setFollowersCount] = useState(initialFollowersCount)
+
+  const handleFollow = async () => {
+    if (!currentUserId) return toast.error('Connecte-toi pour suivre')
+    if (following) {
+      setFollowing(false)
+      setFollowersCount(c => c - 1)
+      await supabase.from('follows')
+        .delete()
+        .eq('follower_id', currentUserId)
+        .eq('following_id', profile.id)
+      toast.success('Abonnement annulé')
+    } else {
+      setFollowing(true)
+      setFollowersCount(c => c + 1)
+      await supabase.from('follows').insert({
+        follower_id: currentUserId,
+        following_id: profile.id,
+      })
+      // Send notification
+      await supabase.from('notifications').insert({
+        user_id: profile.id,
+        actor_id: currentUserId,
+        type: 'follow',
+      })
+      toast.success('Abonné ! 🔥')
+    }
+  }
 
   return (
     <div className="fadeUp">
@@ -94,7 +132,10 @@ export default function ProfileClient({ profile, sessions, isOwn }: {
 
       <div style={{ padding: '0 20px' }}>
         {/* Avatar row */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: -44, marginBottom: 14 }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
+          marginTop: -44, marginBottom: 14,
+        }}>
           <div style={{ position: 'relative' }}>
             <img
               src={profile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.username}`}
@@ -102,22 +143,19 @@ export default function ProfileClient({ profile, sessions, isOwn }: {
               style={{
                 width: 80, height: 80, borderRadius: '50%',
                 border: '3px solid var(--bg)',
-                objectFit: 'cover',
-                background: 'var(--bg3)',
-                display: 'block',
+                objectFit: 'cover', background: 'var(--bg3)', display: 'block',
               }}
             />
             {isOwn && (
               <span style={{
                 position: 'absolute', bottom: 4, right: 4,
                 width: 12, height: 12, borderRadius: '50%',
-                background: 'var(--green)',
-                border: '2px solid var(--bg)',
+                background: 'var(--green)', border: '2px solid var(--bg)',
               }} />
             )}
           </div>
 
-          {isOwn && (
+          {isOwn ? (
             <Link href={`/${profile.username}/edit`} style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '8px 14px', borderRadius: 8,
@@ -127,6 +165,18 @@ export default function ProfileClient({ profile, sessions, isOwn }: {
             }}>
               <IconEdit /> Modifier
             </Link>
+          ) : currentUserId && (
+            <button
+              onClick={handleFollow}
+              style={{
+                padding: '8px 18px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                fontSize: 13, fontWeight: 600, transition: 'all 0.15s',
+                background: following ? 'var(--bg3)' : 'var(--accent)',
+                color: following ? 'var(--text2)' : '#fff',
+              }}
+            >
+              {following ? 'Abonné ✓' : '+ Suivre'}
+            </button>
           )}
         </div>
 
@@ -136,12 +186,25 @@ export default function ProfileClient({ profile, sessions, isOwn }: {
             {profile.display_name}
           </h1>
           <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>@{profile.username}</p>
+
+          {/* Followers / Following counts */}
+          <div style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
+            <span style={{ fontSize: 13, color: 'var(--text)' }}>
+              <strong>{followersCount}</strong>{' '}
+              <span style={{ color: 'var(--text2)' }}>abonné{followersCount !== 1 ? 's' : ''}</span>
+            </span>
+            <span style={{ fontSize: 13, color: 'var(--text)' }}>
+              <strong>{followingCount}</strong>{' '}
+              <span style={{ color: 'var(--text2)' }}>abonnement{followingCount !== 1 ? 's' : ''}</span>
+            </span>
+          </div>
+
           {profile.bio && (
             <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5, fontWeight: 400 }}>{profile.bio}</p>
           )}
         </div>
 
-        {/* Stats row */}
+        {/* Stats row — Séances / Streak / Exercices */}
         <div style={{
           display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
           gap: 8, marginBottom: 28,
@@ -217,7 +280,7 @@ export default function ProfileClient({ profile, sessions, isOwn }: {
                 <IconDumbbell />
               </div>
               <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 16 }}>
-                {isOwn ? 'Lance ta première séance !' : 'Aucune séance pour l\'instant'}
+                {isOwn ? 'Lance ta première séance !' : "Aucune séance pour l'instant"}
               </p>
               {isOwn && (
                 <Link href={`/${profile.username}/journal/add`} style={{
@@ -234,14 +297,15 @@ export default function ProfileClient({ profile, sessions, isOwn }: {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {recentSessions.map((s, i) => (
                 <Link key={s.id} href={`/${profile.username}/journal/${s.id}`} style={{ textDecoration: 'none' }}>
-                  <div style={{
-                    background: 'var(--card)', border: '1px solid var(--border)',
-                    borderRadius: 14, padding: '14px 16px',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    boxShadow: 'var(--shadow)',
-                    animationDelay: `${i * 0.05}s`,
-                  }}
+                  <div
                     className="fadeUp"
+                    style={{
+                      background: 'var(--card)', border: '1px solid var(--border)',
+                      borderRadius: 14, padding: '14px 16px',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      boxShadow: 'var(--shadow)',
+                      animationDelay: `${i * 0.05}s`,
+                    }}
                   >
                     <div>
                       <div className="condensed" style={{ fontSize: 16, fontWeight: 700, marginBottom: 2 }}>{s.title}</div>

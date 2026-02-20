@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Profile } from '@/lib/types'
+import { useEffect, useState } from 'react'
 
 const IconProfile = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -30,9 +31,10 @@ const IconSearch = () => (
     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
   </svg>
 )
-const IconPrograms = () => (
+const IconBell = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-    <path d="M6 4v16M18 4v16M3 8h4M17 8h4M3 16h4M17 16h4M7 12h10"/>
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
   </svg>
 )
 const IconSun = () => (
@@ -55,6 +57,37 @@ export default function AppShell({ children, profile }: { children: React.ReactN
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    if (!profile) return
+
+    // Fetch initial unread count
+    const fetchUnread = async () => {
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', profile.id)
+        .eq('read', false)
+      setUnreadCount(count || 0)
+    }
+    fetchUnread()
+
+    // Realtime: increment badge when a new notification arrives
+    const channel = supabase
+      .channel('notif-bell')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${profile.id}`,
+      }, () => {
+        setUnreadCount(c => c + 1)
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [profile?.id])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -67,16 +100,16 @@ export default function AppShell({ children, profile }: { children: React.ReactN
   const currentTab =
     pathname === '/feed' ? 'feed'
     : pathname === '/search' ? 'search'
+    : pathname === '/notifications' ? 'notifications'
     : pathname.includes('/journal') ? 'journal'
-    : pathname.includes('/programs') ? 'programs'
     : 'profile'
 
   const tabs = [
     { id: 'profile', label: 'PROFIL', icon: <IconProfile />, href: `/${username}` },
-    { id: 'feed', label: 'FEED', icon: <IconFeed />, href: '/feed' },
-    { id: 'journal', label: 'LOG', icon: <IconJournal />, href: `/${username}/journal` },
-    { id: 'search', label: 'SEARCH', icon: <IconSearch />, href: '/search' },
-    { id: 'programs', label: 'PLANS', icon: <IconPrograms />, href: '/programs' },
+    { id: 'feed',    label: 'FEED',   icon: <IconFeed />,    href: '/feed' },
+    { id: 'journal', label: 'LOG',    icon: <IconJournal />, href: `/${username}/journal` },
+    { id: 'search',  label: 'SEARCH', icon: <IconSearch />,  href: '/search' },
+    { id: 'notifications', label: 'NOTIFS', icon: <IconBell />, href: '/notifications' },
   ]
 
   return (
@@ -91,7 +124,10 @@ export default function AppShell({ children, profile }: { children: React.ReactN
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       }}>
         <Link href={username ? `/${username}` : '/'} style={{ textDecoration: 'none' }}>
-          <span className="condensed" style={{ fontSize: 22, fontWeight: 900, color: 'var(--accent)', letterSpacing: '0.08em' }}>
+          <span className="condensed" style={{
+            fontSize: 22, fontWeight: 900,
+            color: 'var(--accent)', letterSpacing: '0.08em',
+          }}>
             FITJOURNAL
           </span>
         </Link>
@@ -111,7 +147,11 @@ export default function AppShell({ children, profile }: { children: React.ReactN
               <img
                 src={profile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.username}`}
                 alt="avatar"
-                style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid var(--accent)', objectFit: 'cover', cursor: 'pointer' }}
+                style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  border: '2px solid var(--accent)',
+                  objectFit: 'cover', cursor: 'pointer',
+                }}
               />
             </Link>
           )}
@@ -131,7 +171,7 @@ export default function AppShell({ children, profile }: { children: React.ReactN
         {children}
       </main>
 
-      {/* Bottom Nav — 5 tabs */}
+      {/* Bottom Nav */}
       {username && (
         <nav style={{
           position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
@@ -144,23 +184,51 @@ export default function AppShell({ children, profile }: { children: React.ReactN
           {tabs.map(t => {
             const active = currentTab === t.id
             return (
-              <Link key={t.id} href={t.href} style={{
-                flex: 1, padding: '9px 0 7px',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                textDecoration: 'none', position: 'relative',
-                color: active ? 'var(--accent)' : 'var(--text2)',
-                transition: 'color 0.15s',
-              }}>
-                {t.icon}
-                <span className="condensed" style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.1em' }}>
-                  {t.label}
-                </span>
+              <Link
+                key={t.id}
+                href={t.href}
+                style={{
+                  flex: 1, padding: '9px 0 7px',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                  textDecoration: 'none', position: 'relative',
+                  color: active ? 'var(--accent)' : 'var(--text2)',
+                  transition: 'color 0.15s',
+                }}
+                onClick={() => {
+                  if (t.id === 'notifications') setUnreadCount(0)
+                }}
+              >
+                {/* Active top indicator */}
                 {active && (
                   <span style={{
                     position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
                     width: 18, height: 2, background: 'var(--accent)', borderRadius: 2,
                   }} />
                 )}
+
+                {/* Icon with badge */}
+                <div style={{ position: 'relative' }}>
+                  {t.icon}
+                  {t.id === 'notifications' && unreadCount > 0 && (
+                    <span style={{
+                      position: 'absolute', top: -5, right: -7,
+                      background: 'var(--accent)', color: '#fff',
+                      borderRadius: '50%', minWidth: 16, height: 16,
+                      fontSize: 9, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: '2px solid var(--bg2)',
+                      padding: '0 2px',
+                    }}>
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </div>
+
+                <span className="condensed" style={{
+                  fontSize: 8, fontWeight: 700, letterSpacing: '0.1em',
+                }}>
+                  {t.label}
+                </span>
               </Link>
             )
           })}

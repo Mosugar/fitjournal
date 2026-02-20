@@ -51,6 +51,7 @@ export default async function SessionDetailPage({
         currentUserId={user?.id || null}
         currentUserProfile={myProfile}
         isOwn={isOwn}
+        sessionOwnerId={session.user_id}
       />
     </AppShell>
   )
