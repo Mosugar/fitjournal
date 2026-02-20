@@ -31,6 +31,12 @@ const IconTrash = () => (
     <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
   </svg>
 )
+const IconEdit = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+)
 const IconBack = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
     <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
@@ -46,14 +52,8 @@ type Comment = {
 }
 
 export default function SessionDetailClient({
-  session,
-  username,
-  likesCount: initialLikes,
-  userLiked: initialLiked,
-  comments: initialComments,
-  currentUserId,
-  currentUserProfile,
-  isOwn,
+  session, username, likesCount: initialLikes, userLiked: initialLiked,
+  comments: initialComments, currentUserId, currentUserProfile, isOwn,
 }: {
   session: Session & { exercises: any[] }
   username: string
@@ -77,16 +77,11 @@ export default function SessionDetailClient({
 
   const handleLike = async () => {
     if (!currentUserId) return toast.error('Connecte-toi pour liker')
-
     if (liked) {
-      setLiked(false)
-      setLikesCount(c => c - 1)
-      await supabase.from('likes').delete()
-        .eq('user_id', currentUserId)
-        .eq('session_id', session.id)
+      setLiked(false); setLikesCount(c => c - 1)
+      await supabase.from('likes').delete().eq('user_id', currentUserId).eq('session_id', session.id)
     } else {
-      setLiked(true)
-      setLikesCount(c => c + 1)
+      setLiked(true); setLikesCount(c => c + 1)
       await supabase.from('likes').insert({ user_id: currentUserId, session_id: session.id })
     }
   }
@@ -95,15 +90,12 @@ export default function SessionDetailClient({
     if (!currentUserId) return toast.error('Connecte-toi pour commenter')
     if (!newComment.trim()) return
     setPosting(true)
-
     const { data, error } = await supabase
       .from('comments')
       .insert({ user_id: currentUserId, session_id: session.id, content: newComment.trim() })
       .select('*, profiles(username, display_name, avatar_url)')
       .single()
-
     if (error) { toast.error('Erreur'); setPosting(false); return }
-
     setComments(prev => [...prev, data])
     setNewComment('')
     setPosting(false)
@@ -129,7 +121,6 @@ export default function SessionDetailClient({
 
   return (
     <div style={{ padding: 20 }} className="fadeUp">
-      {/* Back */}
       <Link href={`/${username}/journal`} style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
         color: 'var(--text2)', textDecoration: 'none', fontSize: 14,
@@ -148,22 +139,30 @@ export default function SessionDetailClient({
             <p style={{ color: 'var(--text2)', fontSize: 13, textTransform: 'capitalize', marginBottom: 10 }}>{dateStr}</p>
           </div>
           {isOwn && (
-            <button onClick={handleDeleteSession} style={{
-              background: 'none', border: 'none', color: 'var(--text2)',
-              cursor: 'pointer', padding: 8,
-            }}>
-              <IconTrash />
-            </button>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <Link href={`/${username}/journal/${session.id}/edit`} style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '7px 12px', borderRadius: 8,
+                background: 'var(--bg3)', border: '1px solid var(--border)',
+                color: 'var(--text)', textDecoration: 'none', fontSize: 13, fontWeight: 500,
+              }}>
+                <IconEdit /> Modifier
+              </Link>
+              <button onClick={handleDeleteSession} style={{
+                background: 'none', border: 'none', color: 'var(--text2)',
+                cursor: 'pointer', padding: 8,
+              }}>
+                <IconTrash />
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Feeling + tags */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {session.feeling && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
-              fontSize: 12, fontWeight: 600,
-              padding: '4px 10px', borderRadius: 20,
+              fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 20,
               background: FEELING_COLORS[session.feeling] + '18',
               color: FEELING_COLORS[session.feeling],
               border: `1px solid ${FEELING_COLORS[session.feeling]}30`,
@@ -176,20 +175,14 @@ export default function SessionDetailClient({
             <span key={t} style={{
               fontSize: 12, padding: '4px 10px', borderRadius: 20,
               background: 'var(--bg3)', color: 'var(--text2)', fontWeight: 500,
-            }}>
-              {t}
-            </span>
+            }}>{t}</span>
           ))}
         </div>
       </div>
 
       {/* Notes */}
       {session.notes && (
-        <div style={{
-          background: 'var(--card)', border: '1px solid var(--border)',
-          borderRadius: 14, padding: 18, marginBottom: 12,
-          boxShadow: 'var(--shadow)',
-        }}>
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 18, marginBottom: 12, boxShadow: 'var(--shadow)' }}>
           <p style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Notes</p>
           <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--text)' }}>{session.notes}</p>
         </div>
@@ -197,11 +190,7 @@ export default function SessionDetailClient({
 
       {/* Exercises */}
       {session.exercises && session.exercises.length > 0 && (
-        <div style={{
-          background: 'var(--card)', border: '1px solid var(--border)',
-          borderRadius: 14, padding: 18, marginBottom: 12,
-          boxShadow: 'var(--shadow)',
-        }}>
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 18, marginBottom: 12, boxShadow: 'var(--shadow)' }}>
           <p style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>Exercices</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {session.exercises.map((ex: any) => (
@@ -211,25 +200,19 @@ export default function SessionDetailClient({
                 padding: '10px 14px', background: 'var(--bg3)', borderRadius: 10,
               }}>
                 <span style={{ fontWeight: 600, fontSize: 14 }}>{ex.name}</span>
-                {ex.sets && <span style={{ fontSize: 13, color: 'var(--text2)' }}>{ex.sets} × </span>}
+                {ex.sets && <span style={{ fontSize: 13, color: 'var(--text2)' }}>{ex.sets} ×</span>}
                 {ex.reps && <span style={{ fontSize: 13, color: 'var(--text2)' }}>{ex.reps} reps</span>}
                 {ex.weight > 0
                   ? <span className="condensed" style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)' }}>{ex.weight}kg</span>
-                  : <span style={{ fontSize: 12, color: 'var(--text2)' }}>PdC</span>
-                }
+                  : <span style={{ fontSize: 12, color: 'var(--text2)' }}>PdC</span>}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Actions bar — likes, comments, share */}
-      <div style={{
-        display: 'flex', gap: 6, marginBottom: 20,
-        padding: '12px 16px',
-        background: 'var(--card)', border: '1px solid var(--border)',
-        borderRadius: 14, boxShadow: 'var(--shadow)',
-      }}>
+      {/* Actions */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 20, padding: '12px 16px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: 'var(--shadow)' }}>
         <button onClick={handleLike} style={{
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer',
@@ -244,8 +227,7 @@ export default function SessionDetailClient({
         <button style={{
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer',
-          background: 'var(--bg3)', color: 'var(--text2)',
-          fontSize: 14, fontWeight: 600,
+          background: 'var(--bg3)', color: 'var(--text2)', fontSize: 14, fontWeight: 600,
         }}>
           <IconComment />
           {comments.length > 0 && comments.length}
@@ -267,7 +249,6 @@ export default function SessionDetailClient({
           Commentaires {comments.length > 0 && `(${comments.length})`}
         </p>
 
-        {/* Comment input */}
         {currentUserId && (
           <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'flex-start' }}>
             <img
@@ -299,53 +280,43 @@ export default function SessionDetailClient({
           </div>
         )}
 
-        {/* Comments list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {comments.length === 0 ? (
             <p style={{ color: 'var(--text2)', fontSize: 14, textAlign: 'center', padding: '20px 0' }}>
               Sois le premier à commenter 💬
             </p>
-          ) : (
-            comments.map(c => (
-              <div key={c.id} style={{
-                display: 'flex', gap: 10, alignItems: 'flex-start',
-                background: 'var(--card)', border: '1px solid var(--border)',
-                borderRadius: 12, padding: 12,
-              }}>
-                <Link href={`/${c.profiles.username}`}>
-                  <img
-                    src={c.profiles.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.profiles.username}`}
-                    style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }}
-                    alt="avatar"
-                  />
-                </Link>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <Link href={`/${c.profiles.username}`} style={{ textDecoration: 'none' }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
-                        {c.profiles.display_name}
-                      </span>
-                      <span style={{ fontSize: 12, color: 'var(--text2)', marginLeft: 6 }}>
-                        @{c.profiles.username}
-                      </span>
-                    </Link>
-                    {(currentUserId === c.user_id || isOwn) && (
-                      <button onClick={() => handleDeleteComment(c.id)} style={{
-                        background: 'none', border: 'none', color: 'var(--text2)',
-                        cursor: 'pointer', padding: 2,
-                      }}>
-                        <IconTrash />
-                      </button>
-                    )}
-                  </div>
-                  <p style={{ fontSize: 14, color: 'var(--text)', margin: 0, lineHeight: 1.4 }}>{c.content}</p>
-                  <p style={{ fontSize: 11, color: 'var(--text2)', margin: '4px 0 0' }}>
-                    {new Date(c.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                  </p>
+          ) : comments.map(c => (
+            <div key={c.id} style={{
+              display: 'flex', gap: 10, alignItems: 'flex-start',
+              background: 'var(--card)', border: '1px solid var(--border)',
+              borderRadius: 12, padding: 12,
+            }}>
+              <Link href={`/${c.profiles.username}`}>
+                <img
+                  src={c.profiles.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.profiles.username}`}
+                  style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }}
+                  alt="avatar"
+                />
+              </Link>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <Link href={`/${c.profiles.username}`} style={{ textDecoration: 'none' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{c.profiles.display_name}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text2)', marginLeft: 6 }}>@{c.profiles.username}</span>
+                  </Link>
+                  {(currentUserId === c.user_id || isOwn) && (
+                    <button onClick={() => handleDeleteComment(c.id)} style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', padding: 2 }}>
+                      <IconTrash />
+                    </button>
+                  )}
                 </div>
+                <p style={{ fontSize: 14, color: 'var(--text)', margin: 0, lineHeight: 1.4 }}>{c.content}</p>
+                <p style={{ fontSize: 11, color: 'var(--text2)', margin: '4px 0 0' }}>
+                  {new Date(c.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </p>
               </div>
-            ))
-          )}
+            </div>
+          ))}
         </div>
       </div>
     </div>
