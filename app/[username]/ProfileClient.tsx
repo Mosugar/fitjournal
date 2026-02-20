@@ -4,7 +4,6 @@ import { Profile, Session } from '@/lib/types'
 import Link from 'next/link'
 
 const FEELING_COLORS = ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6']
-const FEELING_LABELS = ['', 'Épuisé', 'Fatigué', 'Normal', 'Bien', 'Au top']
 
 const IconEdit = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -27,11 +26,49 @@ const IconDumbbell = () => (
     <path d="M6 4v16M18 4v16M3 8h4M17 8h4M3 16h4M17 16h4M7 12h10"/>
   </svg>
 )
+const IconFlame = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <path d="M12 2C9 7 6 8 6 13a6 6 0 0 0 12 0c0-4-3-7-6-11zm0 18a4 4 0 0 1-4-4c0-2.5 1.5-4 4-7 2.5 3 4 4.5 4 7a4 4 0 0 1-4 4z"/>
+  </svg>
+)
+
+function calcStreak(sessions: Session[]): number {
+  if (sessions.length === 0) return 0
+
+  // Get unique dates sorted descending
+  const dates = [...new Set(sessions.map(s => s.date))].sort((a, b) => b.localeCompare(a))
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todayStr = today.toISOString().split('T')[0]
+
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+  // Streak must start from today or yesterday
+  if (dates[0] !== todayStr && dates[0] !== yesterdayStr) return 0
+
+  let streak = 1
+  for (let i = 1; i < dates.length; i++) {
+    const prev = new Date(dates[i - 1])
+    const curr = new Date(dates[i])
+    const diffDays = Math.round((prev.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays === 1) {
+      streak++
+    } else {
+      break
+    }
+  }
+
+  return streak
+}
 
 export default function ProfileClient({ profile, sessions, isOwn }: {
   profile: Profile; sessions: Session[]; isOwn: boolean
 }) {
   const recentSessions = sessions.slice(0, 3)
+  const streak = calcStreak(sessions)
 
   return (
     <div className="fadeUp">
@@ -42,7 +79,6 @@ export default function ProfileClient({ profile, sessions, isOwn }: {
         position: 'relative',
         overflow: 'hidden',
       }}>
-        {/* Geometric pattern */}
         <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.08 }} viewBox="0 0 400 160">
           <line x1="0" y1="160" x2="160" y2="0" stroke="white" strokeWidth="1"/>
           <line x1="80" y1="160" x2="240" y2="0" stroke="white" strokeWidth="1"/>
@@ -57,7 +93,7 @@ export default function ProfileClient({ profile, sessions, isOwn }: {
       </div>
 
       <div style={{ padding: '0 20px' }}>
-        {/* Avatar row — avatar overlaps banner */}
+        {/* Avatar row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: -44, marginBottom: 14 }}>
           <div style={{ position: 'relative' }}>
             <img
@@ -71,7 +107,6 @@ export default function ProfileClient({ profile, sessions, isOwn }: {
                 display: 'block',
               }}
             />
-            {/* Online dot */}
             {isOwn && (
               <span style={{
                 position: 'absolute', bottom: 4, right: 4,
@@ -111,27 +146,50 @@ export default function ProfileClient({ profile, sessions, isOwn }: {
           display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
           gap: 8, marginBottom: 28,
         }}>
-          {[
-            { label: 'Séances', value: sessions.length },
-            { label: 'Streak', value: '–' },
-            { label: 'Plans', value: 3 },
-          ].map(s => (
-            <div key={s.label} style={{
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              borderRadius: 12,
-              padding: '14px 12px',
-              textAlign: 'center',
-              boxShadow: 'var(--shadow)',
-            }}>
-              <div className="condensed" style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent)', lineHeight: 1, marginBottom: 2 }}>
-                {s.value}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                {s.label}
-              </div>
+          <div style={{
+            background: 'var(--card)', border: '1px solid var(--border)',
+            borderRadius: 12, padding: '14px 12px', textAlign: 'center',
+            boxShadow: 'var(--shadow)',
+          }}>
+            <div className="condensed" style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent)', lineHeight: 1, marginBottom: 2 }}>
+              {sessions.length}
             </div>
-          ))}
+            <div style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Séances
+            </div>
+          </div>
+
+          <div style={{
+            background: streak > 0 ? 'linear-gradient(135deg, #ff450010, #ff450022)' : 'var(--card)',
+            border: streak > 0 ? '1px solid #ff450040' : '1px solid var(--border)',
+            borderRadius: 12, padding: '14px 12px', textAlign: 'center',
+            boxShadow: 'var(--shadow)',
+          }}>
+            <div className="condensed" style={{
+              fontSize: 28, fontWeight: 800, lineHeight: 1, marginBottom: 2,
+              color: streak > 0 ? '#ff4500' : 'var(--text2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+            }}>
+              {streak > 0 && <IconFlame />}
+              {streak}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Streak
+            </div>
+          </div>
+
+          <div style={{
+            background: 'var(--card)', border: '1px solid var(--border)',
+            borderRadius: 12, padding: '14px 12px', textAlign: 'center',
+            boxShadow: 'var(--shadow)',
+          }}>
+            <div className="condensed" style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent)', lineHeight: 1, marginBottom: 2 }}>
+              {new Set(sessions.flatMap(s => s.exercises?.map(e => e.name) || [])).size}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Exercices
+            </div>
+          </div>
         </div>
 
         {/* Recent sessions */}
