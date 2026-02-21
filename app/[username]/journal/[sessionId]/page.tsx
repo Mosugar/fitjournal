@@ -6,19 +6,20 @@ import SessionDetailClient from './SessionDetailClient'
 export default async function SessionPage({
   params,
 }: {
-  params: { username: string; sessionId: string }
+  params: Promise<{ username: string; sessionId: string }>
 }) {
+  const { username, sessionId } = await params  // ← FIX: await params first
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   const { data: profile } = await supabase
-    .from('profiles').select('*').eq('username', params.username).single()
+    .from('profiles').select('*').eq('username', username).single()
   if (!profile) return notFound()
 
   const { data: session } = await supabase
     .from('sessions')
     .select('*, exercises(*)')
-    .eq('id', params.sessionId)
+    .eq('id', sessionId)
     .eq('user_id', profile.id)
     .single()
   if (!session) return notFound()
@@ -36,7 +37,6 @@ export default async function SessionPage({
     .eq('session_id', session.id)
     .order('created_at', { ascending: true })
 
-  // Fetch photos
   const { data: photos } = await supabase
     .from('session_photos')
     .select('*')
@@ -51,7 +51,7 @@ export default async function SessionPage({
     <AppShell profile={myProfile}>
       <SessionDetailClient
         session={session}
-        username={params.username}
+        username={username}
         likesCount={likesCount}
         userLiked={userLiked}
         comments={comments || []}
