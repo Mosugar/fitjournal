@@ -38,12 +38,10 @@ export default function ChatClient({
   const supabase = createClient()
   const seenIds = useRef<Set<string>>(new Set(initialMessages.map(m => m.id)))
 
-  // Scroll to bottom whenever messages change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Real-time subscription for OTHER person's messages
   useEffect(() => {
     const channel = supabase
       .channel(`chat-${conversationId}`)
@@ -53,10 +51,8 @@ export default function ChatClient({
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`,
       }, async (payload) => {
-        // Skip if we already added this message (our own optimistic update)
         if (seenIds.current.has(payload.new.id)) return
         seenIds.current.add(payload.new.id)
-
         const { data } = await supabase
           .from('messages')
           .select('*, profiles(username, display_name, avatar_url)')
@@ -75,7 +71,7 @@ export default function ChatClient({
     setInput('')
     setSending(true)
 
-    // Optimistic update — add message immediately to UI
+    // Optimistic update
     const tempId = `temp-${Date.now()}`
     const optimisticMsg: Message = {
       id: tempId,
@@ -93,23 +89,32 @@ export default function ChatClient({
 
     const { data, error } = await supabase
       .from('messages')
-      .insert({
-        conversation_id: conversationId,
-        sender_id: currentUserId,
-        content,
-      })
+      .insert({ conversation_id: conversationId, sender_id: currentUserId, content })
       .select('*, profiles(username, display_name, avatar_url)')
       .single()
 
     if (error) {
-      // Remove optimistic message on error
       setMessages(prev => prev.filter(m => m.id !== tempId))
       toast.error('Failed to send message')
       setInput(content)
-    } else if (data) {
-      // Replace temp message with real one
+      setSending(false)
+      return
+    }
+
+    if (data) {
       seenIds.current.add(data.id)
       setMessages(prev => prev.map(m => m.id === tempId ? data : m))
+
+      // 🔔 Notify the other person
+      if (otherProfile?.id) {
+        await supabase.from('notifications').insert({
+          user_id: otherProfile.id,
+          actor_id: currentUserId,
+          type: 'message',
+          message_preview: content.substring(0, 60),
+          conversation_id: conversationId,
+        })
+      }
     }
 
     setSending(false)
@@ -132,25 +137,19 @@ export default function ChatClient({
     }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap');`}</style>
 
-      {/* Chat header */}
+      {/* Header */}
       <div style={{
-        padding: '12px 16px',
-        background: G.dark,
+        padding: '12px 16px', background: G.dark,
         borderBottom: `1px solid ${G.border}`,
-        display: 'flex', alignItems: 'center', gap: 12,
-        flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
       }}>
-        <Link href="/messages" style={{ color: G.grey, textDecoration: 'none', fontSize: 20, lineHeight: 1, fontWeight: 700 }}>←</Link>
-
+        <Link href="/messages" style={{ color: G.grey, textDecoration: 'none', fontSize: 20, fontWeight: 700 }}>←</Link>
         {otherProfile && (
           <>
             <Link href={`/${otherProfile.username}`}>
               <div style={{ width: 38, height: 38, padding: 2, background: G.gold, flexShrink: 0 }}>
-                <img
-                  src={otherProfile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherProfile.username}`}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  alt="avatar"
-                />
+                <img src={otherProfile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherProfile.username}`}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="avatar" />
               </div>
             </Link>
             <div style={{ flex: 1 }}>
@@ -162,31 +161,22 @@ export default function ChatClient({
               </Link>
             </div>
             {otherProfile.sport && (
-              <span style={{
-                fontSize: 9, padding: '2px 8px',
-                background: `${G.gold}11`, color: G.gold,
-                border: `1px solid ${G.gold}33`,
-                fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
-              }}>#{otherProfile.sport.toUpperCase()}</span>
+              <span style={{ fontSize: 9, padding: '2px 8px', background: `${G.gold}11`, color: G.gold, border: `1px solid ${G.gold}33`, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                #{otherProfile.sport.toUpperCase()}
+              </span>
             )}
           </>
         )}
       </div>
 
-      {/* Messages area */}
-      <div style={{
-        flex: 1, overflowY: 'auto',
-        padding: '16px',
-        display: 'flex', flexDirection: 'column', gap: 2,
-      }}>
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         {messages.length === 0 ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>💬</div>
               <p style={{ color: G.grey, fontSize: 14 }}>Start the conversation</p>
-              <p style={{ color: G.grey, fontSize: 12, marginTop: 4 }}>
-                Say something to {otherProfile?.display_name}
-              </p>
+              <p style={{ color: G.grey, fontSize: 12, marginTop: 4 }}>Say something to {otherProfile?.display_name}</p>
             </div>
           </div>
         ) : messages.map((msg, i) => {
@@ -194,7 +184,6 @@ export default function ChatClient({
           const msgDate = formatDate(msg.created_at)
           const showDate = msgDate !== lastDate
           if (showDate) lastDate = msgDate
-
           const prevMsg = messages[i - 1]
           const nextMsg = messages[i + 1]
           const isFirst = !prevMsg || prevMsg.sender_id !== msg.sender_id
@@ -205,34 +194,20 @@ export default function ChatClient({
             <div key={msg.id}>
               {showDate && (
                 <div style={{ textAlign: 'center', padding: '12px 0 8px' }}>
-                  <span style={{
-                    fontSize: 10, color: G.grey, fontWeight: 700,
-                    letterSpacing: '0.1em', textTransform: 'uppercase',
-                    background: G.black, padding: '2px 10px',
-                    border: `1px solid ${G.border}`,
-                  }}>{msgDate}</span>
+                  <span style={{ fontSize: 10, color: G.grey, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', background: G.black, padding: '2px 10px', border: `1px solid ${G.border}` }}>
+                    {msgDate}
+                  </span>
                 </div>
               )}
-
-              <div style={{
-                display: 'flex',
-                flexDirection: isMe ? 'row-reverse' : 'row',
-                alignItems: 'flex-end', gap: 8,
-                marginTop: isFirst ? 8 : 2,
-              }}>
-                {/* Other person avatar */}
+              <div style={{ display: 'flex', flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 8, marginTop: isFirst ? 8 : 2 }}>
                 <div style={{ width: 28, flexShrink: 0 }}>
                   {!isMe && isLast && (
                     <div style={{ width: 28, height: 28, padding: 2, background: G.border }}>
-                      <img
-                        src={otherProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherProfile?.username}`}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                        alt="avatar"
-                      />
+                      <img src={otherProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherProfile?.username}`}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="avatar" />
                     </div>
                   )}
                 </div>
-
                 <div style={{ maxWidth: '72%' }}>
                   <div style={{
                     padding: '9px 13px',
@@ -240,21 +215,14 @@ export default function ChatClient({
                     color: isMe ? G.black : G.white,
                     border: isMe ? 'none' : `1px solid ${G.border}`,
                     borderLeft: isMe ? 'none' : `3px solid ${G.border}`,
-                    fontSize: 14,
-                    fontFamily: 'Barlow, sans-serif',
-                    lineHeight: 1.4,
+                    fontSize: 14, fontFamily: 'Barlow, sans-serif', lineHeight: 1.4,
                     fontWeight: isMe ? 600 : 400,
-                    opacity: isTemp ? 0.6 : 1,
-                    transition: 'opacity 0.2s',
+                    opacity: isTemp ? 0.6 : 1, transition: 'opacity 0.2s',
                   }}>
                     {msg.content}
                   </div>
                   {isLast && (
-                    <div style={{
-                      fontSize: 10, color: G.grey, marginTop: 3,
-                      textAlign: isMe ? 'right' : 'left',
-                      letterSpacing: '0.04em',
-                    }}>
+                    <div style={{ fontSize: 10, color: G.grey, marginTop: 3, textAlign: isMe ? 'right' : 'left', letterSpacing: '0.04em' }}>
                       {isTemp ? 'sending...' : formatTime(msg.created_at)}
                     </div>
                   )}
@@ -266,40 +234,23 @@ export default function ChatClient({
         <div ref={bottomRef} />
       </div>
 
-      {/* Input bar */}
-      <div style={{
-        padding: '10px 16px',
-        background: G.dark,
-        borderTop: `1px solid ${G.border}`,
-        display: 'flex', gap: 8, flexShrink: 0,
-      }}>
+      {/* Input */}
+      <div style={{ padding: '10px 16px', background: G.dark, borderTop: `1px solid ${G.border}`, display: 'flex', gap: 8, flexShrink: 0 }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
           placeholder="Write a message..."
-          style={{
-            flex: 1, padding: '10px 14px',
-            background: G.black,
-            border: `1px solid ${G.border}`,
-            color: G.white, fontSize: 14, outline: 'none',
-            fontFamily: 'Barlow, sans-serif',
-          }}
+          style={{ flex: 1, padding: '10px 14px', background: G.black, border: `1px solid ${G.border}`, color: G.white, fontSize: 14, outline: 'none', fontFamily: 'Barlow, sans-serif' }}
         />
-        <button
-          onClick={handleSend}
-          disabled={sending || !input.trim()}
-          style={{
-            padding: '10px 20px',
-            background: sending || !input.trim() ? G.card : G.gold,
-            color: sending || !input.trim() ? G.grey : G.black,
-            border: 'none',
-            cursor: sending || !input.trim() ? 'not-allowed' : 'pointer',
-            fontSize: 12, fontWeight: 900,
-            letterSpacing: '0.1em', textTransform: 'uppercase',
-            transition: 'all 0.15s', flexShrink: 0,
-          }}
-        >
+        <button onClick={handleSend} disabled={sending || !input.trim()} style={{
+          padding: '10px 20px',
+          background: sending || !input.trim() ? G.card : G.gold,
+          color: sending || !input.trim() ? G.grey : G.black,
+          border: 'none', cursor: sending || !input.trim() ? 'not-allowed' : 'pointer',
+          fontSize: 12, fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase',
+          transition: 'all 0.15s', flexShrink: 0,
+        }}>
           {sending ? '...' : 'SEND'}
         </button>
       </div>

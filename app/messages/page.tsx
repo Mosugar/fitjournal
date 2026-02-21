@@ -8,33 +8,31 @@ export default async function MessagesPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: myProfile } = await supabase
-    .from('profiles').select('*').eq('id', user.id).single()
-
-  // Get all conversations the user is part of
-  const { data: participations } = await supabase
-    .from('conversation_participants')
-    .select('conversation_id, last_read_at')
-    .eq('user_id', user.id)
+  const [
+    { data: myProfile },
+    { data: participations },
+  ] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('conversation_participants').select('conversation_id, last_read_at').eq('user_id', user.id),
+  ])
 
   const conversationIds = participations?.map(p => p.conversation_id) || []
-
   let conversations: any[] = []
 
   if (conversationIds.length > 0) {
-    // Get the other participant for each conversation
-    const { data: otherParticipants } = await supabase
-      .from('conversation_participants')
-      .select('conversation_id, user_id, profiles(id, username, display_name, avatar_url)')
-      .in('conversation_id', conversationIds)
-      .neq('user_id', user.id)
-
-    // Get last message for each conversation
-    const { data: lastMessages } = await supabase
-      .from('messages')
-      .select('conversation_id, content, created_at, sender_id')
-      .in('conversation_id', conversationIds)
-      .order('created_at', { ascending: false })
+    const [
+      { data: otherParticipants },
+      { data: lastMessages },
+    ] = await Promise.all([
+      supabase.from('conversation_participants')
+        .select('conversation_id, user_id, profiles(id, username, display_name, avatar_url)')
+        .in('conversation_id', conversationIds)
+        .neq('user_id', user.id),
+      supabase.from('messages')
+        .select('conversation_id, content, created_at, sender_id')
+        .in('conversation_id', conversationIds)
+        .order('created_at', { ascending: false }),
+    ])
 
     conversations = conversationIds.map(cid => {
       const other = otherParticipants?.find(p => p.conversation_id === cid)
@@ -45,12 +43,7 @@ export default async function MessagesPage() {
         new Date(lastMsg.created_at) > new Date(myParticipation.last_read_at) &&
         lastMsg.sender_id !== user.id
 
-      return {
-        id: cid,
-        other: other?.profiles,
-        lastMessage: lastMsg,
-        unread,
-      }
+      return { id: cid, other: other?.profiles, lastMessage: lastMsg, unread }
     }).filter(c => c.other).sort((a, b) => {
       if (!a.lastMessage) return 1
       if (!b.lastMessage) return -1

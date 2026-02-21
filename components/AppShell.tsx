@@ -60,7 +60,8 @@ export default function AppShell({ children, profile }: { children: React.ReactN
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const [unreadCount, setUnreadCount] = useState(0)
+  const [unreadNotifs, setUnreadNotifs] = useState(0)
+  const [unreadMessages, setUnreadMessages] = useState(0)
   const [dark, setDark] = useState(true)
 
   useEffect(() => {
@@ -75,23 +76,44 @@ export default function AppShell({ children, profile }: { children: React.ReactN
 
   useEffect(() => {
     if (!profile) return
-    const fetchUnread = async () => {
-      const { count } = await supabase
+
+    const fetchCounts = async () => {
+      // Unread notifications (non-message)
+      const { count: notifCount } = await supabase
         .from('notifications')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', profile.id)
         .eq('read', false)
-      setUnreadCount(count || 0)
+        .neq('type', 'message')
+      setUnreadNotifs(notifCount || 0)
+
+      // Unread messages
+      const { count: msgCount } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', profile.id)
+        .eq('read', false)
+        .eq('type', 'message')
+      setUnreadMessages(msgCount || 0)
     }
-    fetchUnread()
+
+    fetchCounts()
+
     const channel = supabase
-      .channel('notif-bell')
+      .channel('notif-shell')
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public',
         table: 'notifications',
         filter: `user_id=eq.${profile.id}`,
-      }, () => setUnreadCount(c => c + 1))
+      }, (payload) => {
+        if (payload.new.type === 'message') {
+          setUnreadMessages(c => c + 1)
+        } else {
+          setUnreadNotifs(c => c + 1)
+        }
+      })
       .subscribe()
+
     return () => { supabase.removeChannel(channel) }
   }, [profile?.id])
 
@@ -111,73 +133,60 @@ export default function AppShell({ children, profile }: { children: React.ReactN
     : 'profile'
 
   const tabs = [
-    { id: 'profile',  label: 'PROFIL', icon: <IconProfile />, href: `/${username}` },
-    { id: 'feed',     label: 'FEED',   icon: <IconFeed />,    href: '/feed' },
-    { id: 'journal',  label: 'LOG',    icon: <IconJournal />, href: `/${username}/journal` },
-    { id: 'search',   label: 'SEARCH', icon: <IconSearch />,  href: '/search' },
-    { id: 'messages', label: 'MSG',    icon: <IconMessage />, href: '/messages' },
+    { id: 'profile',  label: 'PROFIL', icon: <IconProfile />, href: `/${username}`, badge: 0 },
+    { id: 'feed',     label: 'FEED',   icon: <IconFeed />,    href: '/feed',         badge: 0 },
+    { id: 'journal',  label: 'LOG',    icon: <IconJournal />, href: `/${username}/journal`, badge: 0 },
+    { id: 'search',   label: 'SEARCH', icon: <IconSearch />,  href: '/search',       badge: 0 },
+    { id: 'messages', label: 'MSG',    icon: <IconMessage />, href: '/messages',     badge: unreadMessages },
   ]
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0800' }}>
 
-      {/* Header — like Instagram: logo left, bells + avatar right */}
+      {/* Header */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 50,
         background: '#0f0d00',
         borderBottom: '1px solid #2a2518',
-        padding: '0 16px',
-        height: 52,
+        padding: '0 16px', height: 52,
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       }}>
         <Link href={username ? `/${username}` : '/'} style={{ textDecoration: 'none' }}>
-          <span style={{
-            fontSize: 22, fontWeight: 900,
-            color: '#f5c800', letterSpacing: '0.1em',
-            fontFamily: "'Barlow Condensed', sans-serif",
-          }}>
+          <span style={{ fontSize: 22, fontWeight: 900, color: '#f5c800', letterSpacing: '0.1em', fontFamily: "'Barlow Condensed', sans-serif" }}>
             FITJOURNAL
           </span>
         </Link>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          {/* Theme toggle */}
-          <button onClick={() => setDark(!dark)} style={{
-            width: 36, height: 36,
-            background: 'transparent', border: 'none',
-            cursor: 'pointer', color: '#5a5648',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+          <button onClick={() => setDark(!dark)} style={{ width: 36, height: 36, background: 'transparent', border: 'none', cursor: 'pointer', color: '#5a5648', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {dark ? <IconSun /> : <IconMoon />}
           </button>
 
-          {/* Notifications bell — Instagram style in header */}
+          {/* Bell — notifications in header like Instagram */}
           {profile && (
-            <Link href="/notifications" onClick={() => setUnreadCount(0)} style={{
+            <Link href="/notifications" onClick={() => setUnreadNotifs(0)} style={{
               width: 36, height: 36, position: 'relative',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: pathname === '/notifications' ? '#f5c800' : '#5a5648',
               textDecoration: 'none',
             }}>
               <IconBell />
-              {unreadCount > 0 && (
+              {unreadNotifs > 0 && (
                 <span style={{
                   position: 'absolute', top: 4, right: 4,
                   background: '#f5c800', color: '#0a0800',
                   borderRadius: '50%', minWidth: 16, height: 16,
                   fontSize: 9, fontWeight: 900,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: '2px solid #0f0d00',
-                  padding: '0 2px',
+                  border: '2px solid #0f0d00', padding: '0 2px',
                   fontFamily: "'Barlow Condensed', sans-serif",
                 }}>
-                  {unreadCount > 9 ? '9+' : unreadCount}
+                  {unreadNotifs > 9 ? '9+' : unreadNotifs}
                 </span>
               )}
             </Link>
           )}
 
-          {/* Avatar */}
           {profile && (
             <Link href={`/${username}`}>
               <div style={{ width: 30, height: 30, padding: 2, background: '#f5c800' }}>
@@ -190,59 +199,57 @@ export default function AppShell({ children, profile }: { children: React.ReactN
             </Link>
           )}
 
-          <button onClick={handleLogout} style={{
-            background: 'none', border: 'none',
-            color: '#5a5648', cursor: 'pointer',
-            fontSize: 11, fontWeight: 700,
-            fontFamily: "'Barlow Condensed', sans-serif",
-            letterSpacing: '0.1em', textTransform: 'uppercase',
-            marginLeft: 4,
-          }}>
+          <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#5a5648', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: '0.1em', textTransform: 'uppercase', marginLeft: 4 }}>
             Quit
           </button>
         </div>
       </header>
 
-      {/* Content */}
       <main style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 72 }}>
         {children}
       </main>
 
-      {/* Bottom Nav — 5 tabs, clean like Instagram */}
+      {/* Bottom Nav */}
       {username && (
         <nav style={{
           position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
           width: '100%', maxWidth: 480,
-          background: '#0f0d00',
-          borderTop: '1px solid #2a2518',
+          background: '#0f0d00', borderTop: '1px solid #2a2518',
           display: 'flex', zIndex: 100,
           paddingBottom: 'env(safe-area-inset-bottom, 0)',
         }}>
           {tabs.map(t => {
             const active = currentTab === t.id
             return (
-              <Link
-                key={t.id}
-                href={t.href}
-                style={{
-                  flex: 1, padding: '10px 0 8px',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                  textDecoration: 'none', position: 'relative',
-                  color: active ? '#f5c800' : '#3a3428',
-                  transition: 'color 0.15s',
-                }}
+              <Link key={t.id} href={t.href} style={{
+                flex: 1, padding: '10px 0 8px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                textDecoration: 'none', position: 'relative',
+                color: active ? '#f5c800' : '#3a3428',
+                transition: 'color 0.15s',
+              }}
+              onClick={() => { if (t.id === 'messages') setUnreadMessages(0) }}
               >
                 {active && (
-                  <span style={{
-                    position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
-                    width: 24, height: 2, background: '#f5c800',
-                  }} />
+                  <span style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 24, height: 2, background: '#f5c800' }} />
                 )}
-                {t.icon}
-                <span style={{
-                  fontSize: 8, fontWeight: 700, letterSpacing: '0.08em',
-                  fontFamily: "'Barlow Condensed', sans-serif",
-                }}>
+                <div style={{ position: 'relative' }}>
+                  {t.icon}
+                  {t.badge > 0 && (
+                    <span style={{
+                      position: 'absolute', top: -5, right: -7,
+                      background: '#f5c800', color: '#0a0800',
+                      borderRadius: '50%', minWidth: 16, height: 16,
+                      fontSize: 9, fontWeight: 900,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: '2px solid #0f0d00', padding: '0 2px',
+                      fontFamily: "'Barlow Condensed', sans-serif",
+                    }}>
+                      {t.badge > 9 ? '9+' : t.badge}
+                    </span>
+                  )}
+                </div>
+                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', fontFamily: "'Barlow Condensed', sans-serif" }}>
                   {t.label}
                 </span>
               </Link>
