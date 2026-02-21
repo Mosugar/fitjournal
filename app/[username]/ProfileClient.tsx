@@ -7,6 +7,7 @@
 import { Profile, Session } from '@/lib/types'
 import Link from 'next/link'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 
@@ -50,6 +51,11 @@ const IconFlame = () => (
 const IconPlus = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+)
+const IconMsg = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
   </svg>
 )
 
@@ -102,8 +108,10 @@ export default function ProfileClient({
   const recentSessions = sessions.slice(0, 3)
   const streak = calcStreak(sessions)
   const supabase = createClient()
+  const router = useRouter()
   const [following, setFollowing] = useState(initialIsFollowing)
   const [followersCount, setFollowersCount] = useState(initialFollowersCount)
+  const [messaging, setMessaging] = useState(false)
 
   const handleFollow = async () => {
     if (!currentUserId) return toast.error('Sign in to follow')
@@ -117,6 +125,55 @@ export default function ProfileClient({
       await supabase.from('notifications').insert({ user_id: profile.id, actor_id: currentUserId, type: 'follow' })
       toast.success('Following! 🔥')
     }
+  }
+
+  const handleMessage = async () => {
+    if (!currentUserId) return toast.error('Sign in to message')
+    setMessaging(true)
+
+    // Check if a conversation already exists between the two users
+    const { data: myParticipations } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', currentUserId)
+
+    const myConvIds = myParticipations?.map(p => p.conversation_id) || []
+
+    if (myConvIds.length > 0) {
+      const { data: shared } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', profile.id)
+        .in('conversation_id', myConvIds)
+        .single()
+
+      if (shared) {
+        router.push(`/messages/${shared.conversation_id}`)
+        setMessaging(false)
+        return
+      }
+    }
+
+    // Create new conversation
+    const { data: conv, error } = await supabase
+      .from('conversations')
+      .insert({})
+      .select()
+      .single()
+
+    if (error || !conv) {
+      toast.error('Could not start conversation')
+      setMessaging(false)
+      return
+    }
+
+    await supabase.from('conversation_participants').insert([
+      { conversation_id: conv.id, user_id: currentUserId },
+      { conversation_id: conv.id, user_id: profile.id },
+    ])
+
+    router.push(`/messages/${conv.id}`)
+    setMessaging(false)
   }
 
   // PRs: prioritize Big 3
@@ -176,16 +233,29 @@ export default function ProfileClient({
               <IconEdit /> EDIT PROFILE
             </Link>
           ) : currentUserId && (
-            <button onClick={handleFollow} style={{
-              padding:'8px 20px', border:'none', cursor:'pointer',
-              fontSize:13, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase',
-              background: following ? 'transparent' : G.gold,
-              color: following ? G.gold : G.black,
-              outline: following ? `1px solid ${G.gold}` : 'none',
-              transition:'all 0.15s',
-            }}>
-              {following ? 'FOLLOWING ✓' : '+ FOLLOW'}
-            </button>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={handleFollow} style={{
+                padding:'8px 16px', border:'none', cursor:'pointer',
+                fontSize:13, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase',
+                background: following ? 'transparent' : G.gold,
+                color: following ? G.gold : G.black,
+                outline: following ? `1px solid ${G.gold}` : 'none',
+                transition:'all 0.15s',
+              }}>
+                {following ? 'FOLLOWING ✓' : '+ FOLLOW'}
+              </button>
+              <button onClick={handleMessage} disabled={messaging} style={{
+                padding:'8px 14px', cursor: messaging ? 'not-allowed' : 'pointer',
+                fontSize:13, fontWeight:900, letterSpacing:'0.1em', textTransform:'uppercase',
+                background: 'transparent',
+                color: messaging ? G.grey : G.gold,
+                border: `1px solid ${messaging ? G.grey : G.gold}`,
+                display:'flex', alignItems:'center', gap:6,
+                transition:'all 0.15s',
+              }}>
+                <IconMsg /> {messaging ? '...' : 'MSG'}
+              </button>
+            </div>
           )}
         </div>
 
