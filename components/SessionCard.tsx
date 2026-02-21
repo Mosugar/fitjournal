@@ -1,71 +1,62 @@
 import { Session } from '@/lib/types'
 
-const FEELING_COLORS = ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6']
-const FEELING_LABELS = ['', 'Épuisé', 'Fatigué', 'Normal', 'Bien', 'Au top']
-
-const IconArrow = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-  </svg>
-)
+const FEELING_LABELS = ['', 'Exhausted', 'Tired', 'Normal', 'Good', 'On fire']
 
 export default function SessionCard({ session, compact = false }: { session: Session; compact?: boolean }) {
   const date = new Date(session.date)
-  const dateStr = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+  const dateStr = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
     <div style={{
-      background: 'var(--card)',
-      border: '1px solid var(--border)',
-      borderRadius: 14,
-      padding: '16px 18px',
-      transition: 'border-color 0.15s, box-shadow 0.15s',
-      boxShadow: 'var(--shadow)',
+      background: '#161410',
+      border: '1px solid #2a2518',
+      borderLeft: '3px solid #2a2518',
+      padding: '14px 16px',
+      transition: 'border-color 0.15s',
       cursor: 'pointer',
     }}
-      onMouseEnter={e => {
-        e.currentTarget.style.borderColor = 'var(--accent)'
-        e.currentTarget.style.boxShadow = '0 4px 20px rgba(255,69,0,0.1)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.borderColor = 'var(--border)'
-        e.currentTarget.style.boxShadow = 'var(--shadow)'
-      }}
+      onMouseEnter={e => (e.currentTarget.style.borderLeftColor = '#f5c800')}
+      onMouseLeave={e => (e.currentTarget.style.borderLeftColor = '#2a2518')}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ flex: 1, marginRight: 12 }}>
-          <div className="condensed" style={{ fontSize: compact ? 16 : 18, fontWeight: 700, marginBottom: 3, lineHeight: 1.1 }}>
+          <div style={{
+            fontSize: compact ? 15 : 17, fontWeight: 800, marginBottom: 3,
+            color: '#f0ede0', textTransform: 'uppercase', letterSpacing: '0.04em',
+            fontFamily: "'Barlow Condensed', sans-serif",
+          }}>
             {session.title}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: session.tags && session.tags.length > 0 ? 8 : 0 }}>
+          <div style={{ fontSize: 11, color: '#5a5648', marginBottom: session.tags && session.tags.length > 0 ? 8 : 0 }}>
             {dateStr}
           </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
           {session.feeling && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{
-                width: 7, height: 7, borderRadius: '50%',
-                background: FEELING_COLORS[session.feeling],
-                display: 'inline-block',
-              }} />
-              <span style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500 }}>
-                {FEELING_LABELS[session.feeling]}
-              </span>
-            </div>
+            <span style={{
+              fontSize: 9, fontWeight: 700, padding: '2px 7px',
+              background: '#f5c80011', color: '#f5c800',
+              border: '1px solid #f5c80022',
+              fontFamily: "'Barlow Condensed', sans-serif",
+              letterSpacing: '0.1em', textTransform: 'uppercase',
+            }}>
+              {FEELING_LABELS[session.feeling]}
+            </span>
           )}
-          <span style={{ color: 'var(--text2)' }}><IconArrow /></span>
+          <span style={{ color: '#f5c800', fontSize: 16 }}>→</span>
         </div>
       </div>
 
       {session.tags && session.tags.length > 0 && (
-        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: compact ? 0 : 8 }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: compact ? 0 : 8 }}>
           {session.tags.map(t => (
             <span key={t} style={{
-              fontSize: 11, padding: '2px 8px', borderRadius: 20,
-              background: 'var(--bg3)', color: 'var(--text2)',
-              fontWeight: 500, letterSpacing: '0.02em',
+              fontSize: 10, padding: '2px 7px',
+              background: '#0a0800', color: '#5a5648',
+              border: '1px solid #2a2518',
+              fontFamily: "'Barlow Condensed', sans-serif",
+              fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
             }}>
               {t}
             </span>
@@ -74,14 +65,14 @@ export default function SessionCard({ session, compact = false }: { session: Ses
       )}
 
       {!compact && session.notes && (
-        <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>
+        <p style={{ margin: '8px 0 0', fontSize: 13, color: '#5a5648', lineHeight: 1.5 }}>
           {session.notes.substring(0, 100)}{session.notes.length > 100 ? '...' : ''}
         </p>
       )}
 
       {compact && session.exercises && session.exercises.length > 0 && (
-        <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text2)' }}>
-          {session.exercises.length} exercice{session.exercises.length > 1 ? 's' : ''}
+        <p style={{ margin: '4px 0 0', fontSize: 11, color: '#5a5648' }}>
+          {session.exercises.length} exercise{session.exercises.length > 1 ? 's' : ''}
           {' · '}{session.exercises.slice(0, 3).map(e => e.name).join(', ')}
           {session.exercises.length > 3 ? '...' : ''}
         </p>
