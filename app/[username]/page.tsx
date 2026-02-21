@@ -31,19 +31,16 @@ export default async function ProfilePage({
     ? await supabase.from('profiles').select('*').eq('id', user.id).single()
     : { data: null }
 
-  // Followers count (people who follow this profile)
   const { count: followersCount } = await supabase
     .from('follows')
     .select('*', { count: 'exact', head: true })
     .eq('following_id', profile.id)
 
-  // Following count (people this profile follows)
   const { count: followingCount } = await supabase
     .from('follows')
     .select('*', { count: 'exact', head: true })
     .eq('follower_id', profile.id)
 
-  // Is the current user following this profile?
   const { data: followRow } = user && user.id !== profile.id
     ? await supabase
         .from('follows')
@@ -52,6 +49,20 @@ export default async function ProfilePage({
         .eq('following_id', profile.id)
         .single()
     : { data: null }
+
+  // Palmares
+  const { data: palmares } = await supabase
+    .from('palmares')
+    .select('*')
+    .eq('user_id', profile.id)
+    .order('year', { ascending: false })
+
+  // Personal records
+  const { data: personalRecords } = await supabase
+    .from('personal_records')
+    .select('*')
+    .eq('user_id', profile.id)
+    .order('lift', { ascending: true })
 
   const isOwn = user?.id === profile.id
 
@@ -65,6 +76,8 @@ export default async function ProfilePage({
         followingCount={followingCount || 0}
         isFollowing={!!followRow}
         currentUserId={user?.id || null}
+        palmares={palmares || []}
+        personalRecords={personalRecords || []}
       />
     </AppShell>
   )
