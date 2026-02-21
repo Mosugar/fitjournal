@@ -4,10 +4,17 @@ import PersonalRecordsClient from './PersonalRecordsClient'
 
 export default async function PersonalRecordsPage({ params }: { params: { username: string } }) {
   const supabase = await createClient()
+
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: profile } = await supabase.from('profiles').select('*').eq('username', params.username).single()
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('username', params.username)
+    .single()
 
   if (!profile) redirect('/')
+
   if (!user || user.id !== profile.id) redirect(`/${params.username}`)
 
   const { data: prs } = await supabase
