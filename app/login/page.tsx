@@ -7,7 +7,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 
 const GoogleIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24">
+  <svg width="16" height="16" viewBox="0 0 24 24">
     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
@@ -24,12 +24,12 @@ export default function LoginPage() {
   const supabase = createClient()
 
   const handleLogin = async () => {
-    if (!email || !password) return toast.error('Remplis tous les champs')
+    if (!email || !password) return toast.error('Fill in all fields')
     setLoading(true)
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { toast.error('Email ou mot de passe incorrect'); setLoading(false); return }
+    if (error) { toast.error('Wrong email or password'); setLoading(false); return }
     const { data: profile } = await supabase.from('profiles').select('username').eq('id', data.user.id).single()
-    toast.success('Connecté ! 💪')
+    toast.success('Welcome back! 💪')
     router.push(profile ? `/${profile.username}` : '/')
     router.refresh()
   }
@@ -40,82 +40,98 @@ export default function LoginPage() {
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     })
-    if (error) { toast.error('Erreur Google'); setGoogleLoading(false) }
+    if (error) { toast.error('Google error'); setGoogleLoading(false) }
   }
 
   const inp: React.CSSProperties = {
-    width: '100%', padding: '12px 16px', borderRadius: 10,
-    background: 'var(--bg3)', border: '1px solid var(--border)',
-    color: 'var(--text)', fontSize: 15, outline: 'none', boxSizing: 'border-box',
+    width: '100%', padding: '12px 16px',
+    background: '#111007', border: '1px solid #2a2518',
+    color: '#f0ede0', fontSize: 14, outline: 'none',
+    boxSizing: 'border-box', fontFamily: 'Barlow, sans-serif',
   }
 
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', background: 'var(--bg)', padding: 20,
+      justifyContent: 'center', background: '#0a0800', padding: 20,
       position: 'relative', overflow: 'hidden',
     }}>
-      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: '-30%', right: '-20%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,69,0,0.06) 0%, transparent 70%)' }} />
-        <div style={{ position: 'absolute', bottom: '-20%', left: '-20%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,102,255,0.04) 0%, transparent 70%)' }} />
-      </div>
+      {/* Background diagonal lines */}
+      <svg style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', opacity: 0.04, pointerEvents: 'none' }} viewBox="0 0 400 800">
+        {[0, 50, 100, 150, 200, 250, 300, 350, 400, 450].map(x => (
+          <line key={x} x1={x} y1="0" x2={x - 800} y2="800" stroke="#f5c800" strokeWidth="1" />
+        ))}
+      </svg>
 
-      <div style={{ width: '100%', maxWidth: 380, position: 'relative', zIndex: 1 }} className="fadeUp">
+      <div style={{ width: '100%', maxWidth: 380, position: 'relative', zIndex: 1 }}>
+
+        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <h1 className="condensed" style={{ fontSize: 52, fontWeight: 900, color: 'var(--accent)', letterSpacing: '0.06em', lineHeight: 1, marginBottom: 8 }}>
-            FITJOURNAL
-          </h1>
-          <p style={{ color: 'var(--text2)', fontSize: 14 }}>Ton journal d'entraînement social</p>
+          <div style={{ display: 'inline-block', borderBottom: '3px solid #f5c800', paddingBottom: 8, marginBottom: 12 }}>
+            <h1 style={{
+              fontSize: 52, fontWeight: 900, color: '#f5c800',
+              letterSpacing: '0.1em', lineHeight: 1,
+              fontFamily: "'Barlow Condensed', sans-serif",
+            }}>
+              FITJOURNAL
+            </h1>
+          </div>
+          <p style={{ color: '#5a5648', fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: "'Barlow Condensed', sans-serif" }}>
+            Your training journal
+          </p>
         </div>
 
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 20, padding: 28, boxShadow: 'var(--shadow-lg)' }}>
-          
+        <div style={{ background: '#161410', border: '1px solid #2a2518', borderTop: '3px solid #f5c800', padding: 28 }}>
+
           {/* Tabs */}
-          <div style={{ display: 'flex', background: 'var(--bg3)', borderRadius: 12, padding: 3, marginBottom: 24, gap: 3 }}>
-            {[['login', 'Connexion', '/login'], ['signup', 'Inscription', '/signup']].map(([id, label, href]) => (
+          <div style={{ display: 'flex', marginBottom: 24, borderBottom: '1px solid #2a2518' }}>
+            {[['login', 'Sign In', '/login'], ['signup', 'Sign Up', '/signup']].map(([id, label, href]) => (
               <Link key={id} href={href} style={{
-                flex: 1, padding: '9px', borderRadius: 10, textAlign: 'center',
-                fontWeight: 600, fontSize: 14, textDecoration: 'none', transition: 'all 0.15s',
-                background: id === 'login' ? 'var(--accent)' : 'transparent',
-                color: id === 'login' ? '#fff' : 'var(--text2)',
-                boxShadow: id === 'login' ? '0 2px 8px rgba(255,69,0,0.3)' : 'none',
+                flex: 1, padding: '10px', textAlign: 'center',
+                fontWeight: 700, fontSize: 12, textDecoration: 'none',
+                letterSpacing: '0.12em', textTransform: 'uppercase',
+                fontFamily: "'Barlow Condensed', sans-serif",
+                color: id === 'login' ? '#f5c800' : '#5a5648',
+                borderBottom: id === 'login' ? '2px solid #f5c800' : '2px solid transparent',
+                marginBottom: -1,
               }}>{label}</Link>
             ))}
           </div>
 
           {/* Google */}
           <button onClick={handleGoogle} disabled={googleLoading} style={{
-            width: '100%', padding: '12px', borderRadius: 12, marginBottom: 16,
-            background: 'var(--bg3)', border: '1px solid var(--border)',
-            color: 'var(--text)', cursor: googleLoading ? 'not-allowed' : 'pointer',
-            fontSize: 15, fontWeight: 600, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', gap: 10, opacity: googleLoading ? 0.7 : 1,
-            boxSizing: 'border-box',
+            width: '100%', padding: '11px', marginBottom: 16,
+            background: 'transparent', border: '1px solid #2a2518',
+            color: '#f0ede0', cursor: googleLoading ? 'not-allowed' : 'pointer',
+            fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: 10, opacity: googleLoading ? 0.6 : 1,
+            boxSizing: 'border-box', fontFamily: 'Barlow, sans-serif',
           }}>
             <GoogleIcon />
-            {googleLoading ? 'Redirection...' : 'Continuer avec Google'}
+            {googleLoading ? 'Redirecting...' : 'Continue with Google'}
           </button>
 
           {/* Divider */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            <span style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 500 }}>ou</span>
-            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            <div style={{ flex: 1, height: 1, background: '#2a2518' }} />
+            <span style={{ fontSize: 10, color: '#5a5648', fontWeight: 700, letterSpacing: '0.1em', fontFamily: "'Barlow Condensed', sans-serif" }}>OR</span>
+            <div style={{ flex: 1, height: 1, background: '#2a2518' }} />
           </div>
 
-          {/* Email form */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Form */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <input style={inp} type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
-            <input style={inp} type="password" placeholder="Mot de passe" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+            <input style={inp} type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
             <button onClick={handleLogin} disabled={loading} style={{
-              padding: '13px', borderRadius: 12, marginTop: 4,
-              background: loading ? 'var(--bg3)' : 'var(--accent)',
-              color: '#fff', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: 15, fontWeight: 700, letterSpacing: '0.02em',
-              boxShadow: loading ? 'none' : '0 4px 14px rgba(255,69,0,0.3)',
+              padding: '13px', marginTop: 4,
+              background: loading ? '#111007' : '#f5c800',
+              color: loading ? '#5a5648' : '#0a0800',
+              border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+              fontSize: 14, fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase',
+              fontFamily: "'Barlow Condensed', sans-serif",
               transition: 'all 0.15s',
             }}>
-              {loading ? 'Connexion...' : 'Se connecter'}
+              {loading ? 'SIGNING IN...' : 'SIGN IN'}
             </button>
           </div>
         </div>
