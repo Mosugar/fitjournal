@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Session } from '@/lib/types'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
+import SessionPhotos from '@/components/SessionPhotos'
 
 const FEELING_LABELS = ['', 'Exhausted', 'Tired', 'Normal', 'Good', 'On fire']
 
@@ -30,9 +31,12 @@ type Comment = {
   profiles: { username: string; display_name: string; avatar_url: string | null }
 }
 
+type Photo = { id: string; url: string; storage_path: string; created_at: string }
+
 export default function SessionDetailClient({
   session, username, likesCount: initialLikes, userLiked: initialLiked,
   comments: initialComments, currentUserId, currentUserProfile, isOwn, sessionOwnerId,
+  photos: initialPhotos = [],
 }: {
   session: Session & { exercises: any[] }
   username: string
@@ -43,6 +47,7 @@ export default function SessionDetailClient({
   currentUserProfile: any
   isOwn: boolean
   sessionOwnerId: string
+  photos?: Photo[]
 }) {
   const [liked, setLiked] = useState(initialLiked)
   const [likesCount, setLikesCount] = useState(initialLikes)
@@ -220,6 +225,14 @@ export default function SessionDetailClient({
           </div>
         </div>
       )}
+
+      {/* Photos */}
+      <SessionPhotos
+        sessionId={session.id}
+        userId={sessionOwnerId}
+        initialPhotos={initialPhotos}
+        isOwn={isOwn}
+      />
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, padding: '10px 14px', background: '#161410', border: '1px solid #2a2518' }}>
