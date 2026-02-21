@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 
-const FEELING_COLORS = ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6']
+const FEELING_COLORS = ['', '#888', '#aaa', '#f5c800', '#f5c800', '#f5c800']
 
 const IconEdit = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -190,20 +190,7 @@ export default function ProfileClient({
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'grayscale(15%)' }}
               />
             </div>
-            {streak > 0 && (
-              <div style={{
-                position: 'absolute', bottom: -6, right: -6,
-                background: '#f5c800',
-                padding: '2px 7px',
-                display: 'flex', alignItems: 'center', gap: 3,
-                border: '2px solid #0a0800',
-              }}>
-                <IconFlame />
-                <span style={{ color: '#0a0800', fontSize: 11, fontWeight: 900, fontFamily: "'Barlow Condensed', sans-serif" }}>
-                  {streak}
-                </span>
-              </div>
-            )}
+
           </div>
 
           {isOwn ? (
@@ -295,7 +282,6 @@ export default function ProfileClient({
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                 marginBottom: 4,
               }}>
-                {stat.flame && stat.value > 0 && <IconFlame />}
                 {stat.value}
               </div>
               <div style={{ fontSize: 9, color: '#5a5648', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em' }}>
