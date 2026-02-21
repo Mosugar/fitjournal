@@ -7,18 +7,18 @@ import { Profile } from '@/lib/types'
 import { useEffect, useState } from 'react'
 
 const IconProfile = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
     <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
   </svg>
 )
 const IconFeed = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
     <polyline points="9 22 9 12 15 12 15 22"/>
   </svg>
 )
 const IconJournal = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
     <rect x="4" y="3" width="16" height="18" rx="2"/>
     <line x1="8" y1="8" x2="16" y2="8"/>
     <line x1="8" y1="12" x2="16" y2="12"/>
@@ -26,8 +26,13 @@ const IconJournal = () => (
   </svg>
 )
 const IconSearch = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+)
+const IconMessage = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
   </svg>
 )
 const IconBell = () => (
@@ -101,22 +106,22 @@ export default function AppShell({ children, profile }: { children: React.ReactN
   const currentTab =
     pathname === '/feed' ? 'feed'
     : pathname === '/search' ? 'search'
-    : pathname === '/notifications' ? 'notifications'
+    : pathname.startsWith('/messages') ? 'messages'
     : pathname.includes('/journal') ? 'journal'
     : 'profile'
 
   const tabs = [
-    { id: 'profile',       label: 'PROFIL',  icon: <IconProfile />, href: `/${username}` },
-    { id: 'feed',          label: 'FEED',    icon: <IconFeed />,    href: '/feed' },
-    { id: 'journal',       label: 'LOG',     icon: <IconJournal />, href: `/${username}/journal` },
-    { id: 'search',        label: 'SEARCH',  icon: <IconSearch />,  href: '/search' },
-    { id: 'notifications', label: 'NOTIFS',  icon: <IconBell />,    href: '/notifications' },
+    { id: 'profile',  label: 'PROFIL', icon: <IconProfile />, href: `/${username}` },
+    { id: 'feed',     label: 'FEED',   icon: <IconFeed />,    href: '/feed' },
+    { id: 'journal',  label: 'LOG',    icon: <IconJournal />, href: `/${username}/journal` },
+    { id: 'search',   label: 'SEARCH', icon: <IconSearch />,  href: '/search' },
+    { id: 'messages', label: 'MSG',    icon: <IconMessage />, href: '/messages' },
   ]
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0800' }}>
 
-      {/* Header */}
+      {/* Header — like Instagram: logo left, bells + avatar right */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 50,
         background: '#0f0d00',
@@ -135,16 +140,44 @@ export default function AppShell({ children, profile }: { children: React.ReactN
           </span>
         </Link>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {/* Theme toggle */}
           <button onClick={() => setDark(!dark)} style={{
-            width: 32, height: 32,
-            background: 'transparent', border: '1px solid #2a2518',
+            width: 36, height: 36,
+            background: 'transparent', border: 'none',
             cursor: 'pointer', color: '#5a5648',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             {dark ? <IconSun /> : <IconMoon />}
           </button>
 
+          {/* Notifications bell — Instagram style in header */}
+          {profile && (
+            <Link href="/notifications" onClick={() => setUnreadCount(0)} style={{
+              width: 36, height: 36, position: 'relative',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: pathname === '/notifications' ? '#f5c800' : '#5a5648',
+              textDecoration: 'none',
+            }}>
+              <IconBell />
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: 4, right: 4,
+                  background: '#f5c800', color: '#0a0800',
+                  borderRadius: '50%', minWidth: 16, height: 16,
+                  fontSize: 9, fontWeight: 900,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: '2px solid #0f0d00',
+                  padding: '0 2px',
+                  fontFamily: "'Barlow Condensed', sans-serif",
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </Link>
+          )}
+
+          {/* Avatar */}
           {profile && (
             <Link href={`/${username}`}>
               <div style={{ width: 30, height: 30, padding: 2, background: '#f5c800' }}>
@@ -163,6 +196,7 @@ export default function AppShell({ children, profile }: { children: React.ReactN
             fontSize: 11, fontWeight: 700,
             fontFamily: "'Barlow Condensed', sans-serif",
             letterSpacing: '0.1em', textTransform: 'uppercase',
+            marginLeft: 4,
           }}>
             Quit
           </button>
@@ -174,7 +208,7 @@ export default function AppShell({ children, profile }: { children: React.ReactN
         {children}
       </main>
 
-      {/* Bottom Nav */}
+      {/* Bottom Nav — 5 tabs, clean like Instagram */}
       {username && (
         <nav style={{
           position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
@@ -191,42 +225,22 @@ export default function AppShell({ children, profile }: { children: React.ReactN
                 key={t.id}
                 href={t.href}
                 style={{
-                  flex: 1, padding: '9px 0 7px',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                  flex: 1, padding: '10px 0 8px',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                   textDecoration: 'none', position: 'relative',
                   color: active ? '#f5c800' : '#3a3428',
                   transition: 'color 0.15s',
                 }}
-                onClick={() => { if (t.id === 'notifications') setUnreadCount(0) }}
               >
-                {/* Active top bar */}
                 {active && (
                   <span style={{
                     position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
-                    width: 20, height: 2, background: '#f5c800',
+                    width: 24, height: 2, background: '#f5c800',
                   }} />
                 )}
-
-                <div style={{ position: 'relative' }}>
-                  {t.icon}
-                  {t.id === 'notifications' && unreadCount > 0 && (
-                    <span style={{
-                      position: 'absolute', top: -5, right: -7,
-                      background: '#f5c800', color: '#0a0800',
-                      borderRadius: '50%', minWidth: 16, height: 16,
-                      fontSize: 9, fontWeight: 900,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      border: '2px solid #0f0d00',
-                      padding: '0 2px',
-                      fontFamily: "'Barlow Condensed', sans-serif",
-                    }}>
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </div>
-
+                {t.icon}
                 <span style={{
-                  fontSize: 8, fontWeight: 700, letterSpacing: '0.1em',
+                  fontSize: 8, fontWeight: 700, letterSpacing: '0.08em',
                   fontFamily: "'Barlow Condensed', sans-serif",
                 }}>
                   {t.label}
