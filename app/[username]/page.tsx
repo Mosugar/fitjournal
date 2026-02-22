@@ -2,51 +2,48 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import AppShell from '@/components/AppShell'
 import ProfileClient from './ProfileClient'
+import {
+  getCachedProfile,
+  getCachedMyProfile,
+  getCachedSessions,
+  getCachedPalmares,
+  getCachedPRs,
+  getCachedFollowCounts,
+} from '@/lib/cache/queries'
 
 export default async function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params
   const supabase = await createClient()
-
-  const { data: profile } = await supabase
-    .from('profiles').select('*').eq('username', username).single()
-  if (!profile) return notFound()
-
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [
-    { data: sessions },
-    { data: myProfile },
-    { count: followersCount },
-    { count: followingCount },
-    { data: followRow },
-    { data: palmares },
-    { data: personalRecords },
-  ] = await Promise.all([
-    supabase.from('sessions').select('*, exercises(*)').eq('user_id', profile.id).order('date', { ascending: false }),
-    user ? supabase.from('profiles').select('*').eq('id', user.id).single() : Promise.resolve({ data: null }),
-    supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', profile.id),
-    supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', profile.id),
-    user && user.id !== profile.id
-      ? supabase.from('follows').select('id').eq('follower_id', user.id).eq('following_id', profile.id).single()
-      : Promise.resolve({ data: null }),
-    supabase.from('palmares').select('*').eq('user_id', profile.id).order('year', { ascending: false }),
-    supabase.from('personal_records').select('*').eq('user_id', profile.id).order('lift', { ascending: true }),
+  const [profile, myProfile, follows] = await Promise.all([
+    getCachedProfile(username),
+    user ? getCachedMyProfile(user.id) : null,
+    user ? supabase.from('follows').select('following_id').eq('follower_id', user.id).then(r => r.data) : [],
+  ])
+
+  if (!profile) return notFound()
+
+  const [sessions, { followers, following }, palmares, personalRecords] = await Promise.all([
+    getCachedSessions(profile.id),
+    getCachedFollowCounts(profile.id),
+    getCachedPalmares(profile.id),
+    getCachedPRs(profile.id),
   ])
 
   const isOwn = user?.id === profile.id
+  const followingIds = follows?.map((f: any) => f.following_id) ?? []
 
   return (
-    <AppShell profile={myProfile}>
+    <AppShell profile={myProfile} followingIds={followingIds}>
       <ProfileClient
         profile={profile}
-        sessions={sessions || []}
+        sessions={sessions}
         isOwn={isOwn}
-        followersCount={followersCount || 0}
-        followingCount={followingCount || 0}
-        isFollowing={!!followRow}
-        currentUserId={user?.id || null}
-        palmares={palmares || []}
-        personalRecords={personalRecords || []}
+        followersCount={followers}
+        followingCount={following}
+        palmares={palmares}
+        personalRecords={personalRecords}
       />
     </AppShell>
   )

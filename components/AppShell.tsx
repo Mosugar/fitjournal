@@ -4,8 +4,12 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Profile } from '@/lib/types'
+import { useNotifStore } from '@/lib/store/useNotifStore'
+import { useUserStore } from '@/lib/store/useUserStore'
+import StoreInitializer from '@/components/StoreInitializer'
 import { useEffect, useState } from 'react'
 
+// ── Icons (unchanged) ────────────────────────────────────────
 const IconProfile = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
     <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
@@ -55,13 +59,27 @@ const IconMoon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
   </svg>
 )
+// ─────────────────────────────────────────────────────────────
 
-export default function AppShell({ children, profile }: { children: React.ReactNode; profile: Profile | null }) {
+type AppShellProps = {
+  children: React.ReactNode
+  profile: Profile | null
+  // Optional: pass these from server to hydrate stores
+  followingIds?: string[]
+  likes?: { session_id: string; user_id: string }[]
+}
+
+export default function AppShell({ children, profile, followingIds, likes }: AppShellProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const [unreadNotifs, setUnreadNotifs] = useState(0)
-  const [unreadMessages, setUnreadMessages] = useState(0)
+
+  // Read from stores — no local state for these anymore
+  const unreadNotifs = useNotifStore((s) => s.unreadNotifs)
+  const unreadMessages = useNotifStore((s) => s.unreadMessages)
+  const clearNotifs = useNotifStore((s) => s.clearNotifs)
+  const clearMessages = useNotifStore((s) => s.clearMessages)
+
   const [dark, setDark] = useState(true)
 
   useEffect(() => {
@@ -73,49 +91,6 @@ export default function AppShell({ children, profile }: { children: React.ReactN
     document.documentElement.classList.toggle('dark', dark)
     localStorage.setItem('theme', dark ? 'dark' : 'light')
   }, [dark])
-
-  useEffect(() => {
-    if (!profile) return
-
-    const fetchCounts = async () => {
-      // Unread notifications (non-message)
-      const { count: notifCount } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', profile.id)
-        .eq('read', false)
-        .neq('type', 'message')
-      setUnreadNotifs(notifCount || 0)
-
-      // Unread messages
-      const { count: msgCount } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', profile.id)
-        .eq('read', false)
-        .eq('type', 'message')
-      setUnreadMessages(msgCount || 0)
-    }
-
-    fetchCounts()
-
-    const channel = supabase
-      .channel('notif-shell')
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${profile.id}`,
-      }, (payload) => {
-        if (payload.new.type === 'message') {
-          setUnreadMessages(c => c + 1)
-        } else {
-          setUnreadNotifs(c => c + 1)
-        }
-      })
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [profile?.id])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -133,15 +108,24 @@ export default function AppShell({ children, profile }: { children: React.ReactN
     : 'profile'
 
   const tabs = [
-    { id: 'profile',  label: 'PROFIL', icon: <IconProfile />, href: `/${username}`, badge: 0 },
-    { id: 'feed',     label: 'FEED',   icon: <IconFeed />,    href: '/feed',         badge: 0 },
-    { id: 'journal',  label: 'LOG',    icon: <IconJournal />, href: `/${username}/journal`, badge: 0 },
-    { id: 'search',   label: 'SEARCH', icon: <IconSearch />,  href: '/search',       badge: 0 },
-    { id: 'messages', label: 'MSG',    icon: <IconMessage />, href: '/messages',     badge: unreadMessages },
+    { id: 'profile',  label: 'PROFIL', icon: <IconProfile />, href: `/${username}`,         badge: 0 },
+    { id: 'feed',     label: 'FEED',   icon: <IconFeed />,    href: '/feed',                badge: 0 },
+    { id: 'journal',  label: 'LOG',    icon: <IconJournal />, href: `/${username}/journal`,  badge: 0 },
+    { id: 'search',   label: 'SEARCH', icon: <IconSearch />,  href: '/search',              badge: 0 },
+    { id: 'messages', label: 'MSG',    icon: <IconMessage />, href: '/messages',            badge: unreadMessages },
   ]
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0800' }}>
+      {/*
+        StoreInitializer is invisible — it just pushes server data into Zustand.
+        Real-time subscription for notifications starts here too.
+      */}
+      <StoreInitializer
+        profile={profile}
+        followingIds={followingIds}
+        likes={likes}
+      />
 
       {/* Header */}
       <header style={{
@@ -162,14 +146,17 @@ export default function AppShell({ children, profile }: { children: React.ReactN
             {dark ? <IconSun /> : <IconMoon />}
           </button>
 
-          {/* Bell — notifications in header like Instagram */}
           {profile && (
-            <Link href="/notifications" onClick={() => setUnreadNotifs(0)} style={{
-              width: 36, height: 36, position: 'relative',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: pathname === '/notifications' ? '#f5c800' : '#5a5648',
-              textDecoration: 'none',
-            }}>
+            <Link
+              href="/notifications"
+              onClick={clearNotifs}
+              style={{
+                width: 36, height: 36, position: 'relative',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: pathname === '/notifications' ? '#f5c800' : '#5a5648',
+                textDecoration: 'none',
+              }}
+            >
               <IconBell />
               {unreadNotifs > 0 && (
                 <span style={{
@@ -228,7 +215,7 @@ export default function AppShell({ children, profile }: { children: React.ReactN
                 color: active ? '#f5c800' : '#3a3428',
                 transition: 'color 0.15s',
               }}
-              onClick={() => { if (t.id === 'messages') setUnreadMessages(0) }}
+              onClick={() => { if (t.id === 'messages') clearMessages() }}
               >
                 {active && (
                   <span style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 24, height: 2, background: '#f5c800' }} />

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { invalidateSessions, invalidateFeed, invalidateSession } from '@/lib/cache/invalidate'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 
@@ -27,12 +28,10 @@ export default function AddSessionClient({ username, userId }: { username: strin
     color: '#f0ede0', fontSize: 14, outline: 'none',
     boxSizing: 'border-box', fontFamily: 'Barlow, sans-serif',
   }
-
   const section: React.CSSProperties = {
     background: '#161410', border: '1px solid #2a2518',
     borderLeft: '3px solid #f5c800', padding: 20, marginBottom: 8,
   }
-
   const labelStyle: React.CSSProperties = {
     fontSize: 11, color: '#5a5648', letterSpacing: '0.12em',
     textTransform: 'uppercase', display: 'block', marginBottom: 10,
@@ -51,6 +50,7 @@ export default function AddSessionClient({ username, userId }: { username: strin
     if (!title || !date) return toast.error('Title and date are required')
     setLoading(true)
 
+    // 1. Insert session
     const { data: session, error } = await supabase
       .from('sessions')
       .insert({
@@ -58,10 +58,16 @@ export default function AddSessionClient({ username, userId }: { username: strin
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
         notes,
       })
-      .select().single()
+      .select()
+      .single()
 
-    if (error || !session) { toast.error('Error saving session'); setLoading(false); return }
+    if (error || !session) {
+      toast.error('Error saving session')
+      setLoading(false)
+      return
+    }
 
+    // 2. Insert exercises
     const validExercises = exercises.filter(e => e.name.trim())
     if (validExercises.length > 0) {
       await supabase.from('exercises').insert(
@@ -74,6 +80,11 @@ export default function AddSessionClient({ username, userId }: { username: strin
         }))
       )
     }
+
+    // 3. Bust the cache so profile + feed show the new session immediately
+    await invalidateSessions(userId, username)
+    await invalidateFeed()
+    await invalidateSession(session.id, username)
 
     toast.success('Session saved! 💪')
     router.push(`/${username}/journal`)
