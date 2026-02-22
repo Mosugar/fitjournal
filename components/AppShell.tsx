@@ -8,6 +8,8 @@ import { useNotifStore } from '@/lib/store/useNotifStore'
 import { useUserStore } from '@/lib/store/useUserStore'
 import StoreInitializer from '@/components/StoreInitializer'
 import { useEffect, useState } from 'react'
+import { Toaster } from 'react-hot-toast'
+
 
 // ── Icons (unchanged) ────────────────────────────────────────
 const IconProfile = () => (
@@ -59,6 +61,7 @@ const IconMoon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
   </svg>
 )
+
 // ─────────────────────────────────────────────────────────────
 
 type AppShellProps = {
@@ -236,6 +239,7 @@ export default function AppShell({ children, profile, followingIds, likes }: App
                     </span>
                   )}
                 </div>
+                
                 <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', fontFamily: "'Barlow Condensed', sans-serif" }}>
                   {t.label}
                 </span>
@@ -244,6 +248,15 @@ export default function AppShell({ children, profile, followingIds, likes }: App
           })}
         </nav>
       )}
+      <Toaster
+        toastOptions={{
+          style: {
+            background: '#161410',
+            border: '1px solid #2a2518',
+            color: '#f0ede0',
+          },
+        }}
+      />
     </div>
   )
 }
